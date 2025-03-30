@@ -1,0 +1,1 @@
+Entropic study app xzxz
