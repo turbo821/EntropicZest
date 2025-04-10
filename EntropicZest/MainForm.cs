@@ -6,22 +6,25 @@ using System.Windows.Forms;
 using OfficeOpenXml;
 using System.Windows.Forms.DataVisualization;
 using System.Windows.Forms.DataVisualization.Charting;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace EntropicZest
 {
     public partial class MainForm : Form
     {
+        private List<double> data = new List<double>();
+        private double binSize;
+        private CancellationTokenSource cts;
         public MainForm()
         {
             InitializeComponent();
             ExcelPackage.License.SetNonCommercialPersonal("Hello");
-
+            progressBar.Visible = false;
+            btnCancel.Visible = false;
         }
 
-        private List<double> data = new List<double>();
-        private double binSize;
-
-        private void btnLoadExcel_Click(object sender, EventArgs e)
+        private async void btnLoadExcel_Click(object sender, EventArgs e)
         {
             OpenFileDialog openFileDialog = new OpenFileDialog
             {
@@ -31,43 +34,73 @@ namespace EntropicZest
 
             if (openFileDialog.ShowDialog() == DialogResult.OK)
             {
-                string filePath = openFileDialog.FileName;
-                LoadDataFromExcel(filePath);
-                MessageBox.Show("Данные успешно загружены!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-        private void LoadDataFromExcel(string filePath)
-        {
-            data.Clear();
-
-            FileInfo fileInfo = new FileInfo(filePath);
-
-            using (ExcelPackage package = new ExcelPackage(fileInfo))
-            {
-                ExcelWorksheet worksheet = package.Workbook.Worksheets[0]; // Первый лист
-
-                // Получаем размер используемой области (UsedRange)
-                int rowCount = worksheet.Dimension.Rows;
-                int colCount = worksheet.Dimension.Columns+1;
-                // Начинаем со второго столбца (B) и обрабатываем все столбцы
-                for (int col = 2; col <= colCount; col++)
+                try
                 {
-                    for (int row = 1; row <= rowCount; row++)
-                    {
-                        var cellValue = worksheet.Cells[row, col].Text;
-
-                        // Проверяем, что значение можно преобразовать в double
-                        if (double.TryParse(cellValue, out double value))
-                        {
-                            data.Add(value); // Добавляем значение в список
-                        }
-                    }
+                    SetBusyState(true);
+                    string filePath = openFileDialog.FileName;
+                    await LoadDataFromExcelAsync(filePath);
+                    MessageBox.Show("Данные успешно загружены!", "Успех", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (OperationCanceledException)
+                {
+                    MessageBox.Show("Операция отменена пользователем.", "Информация", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show($"Ошибка при загрузке файла: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                }
+                finally
+                {
+                    SetBusyState(false);
                 }
             }
         }
 
-        private void btnCalculate_Click(object sender, EventArgs e)
+        private async Task LoadDataFromExcelAsync(string filePath)
+        {
+            cts = new CancellationTokenSource();
+            data.Clear();
+
+            IProgress<int> progress = new Progress<int>(percent =>
+            {
+                progressBar.Value = percent;
+                lblStatus.Text = $"Загрузка данных... {percent}%";
+            });
+
+            await Task.Run(() =>
+            {
+                FileInfo fileInfo = new FileInfo(filePath);
+
+                using (ExcelPackage package = new ExcelPackage(fileInfo))
+                {
+                    ExcelWorksheet worksheet = package.Workbook.Worksheets[0];
+                    int rowCount = worksheet.Dimension.Rows;
+                    int colCount = worksheet.Dimension.Columns + 1;
+                    int totalCells = (colCount - 1) * rowCount;
+                    int processedCells = 0;
+
+                    for (int col = 2; col <= colCount; col++)
+                    {
+                        for (int row = 1; row <= rowCount; row++)
+                        {
+                            cts.Token.ThrowIfCancellationRequested();
+
+                            var cellValue = worksheet.Cells[row, col].Text;
+                            if (double.TryParse(cellValue, out double value))
+                            {
+                                data.Add(value);
+                            }
+
+                            processedCells++;
+                            int percent = (int)((double)processedCells / totalCells * 100);
+                            progress.Report(percent);
+                        }
+                    }
+                }
+            }, cts.Token);
+        }
+
+        private async void btnCalculate_Click(object sender, EventArgs e)
         {
             if (data.Count == 0)
             {
@@ -81,6 +114,23 @@ namespace EntropicZest
                 return;
             }
 
+            try
+            {
+                SetBusyState(true);
+                await Task.Run(() => CalculateAndDisplayResults());
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ошибка при расчете: {ex.Message}", "Ошибка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                SetBusyState(false);
+            }
+        }
+
+        private void CalculateAndDisplayResults()
+        {
             double minValue = data.Min();
             double maxValue = data.Max();
             int intervalCount = (int)Math.Ceiling((maxValue - minValue) / binSize);
@@ -108,21 +158,24 @@ namespace EntropicZest
 
             double entropy = CalculateEntropy(distribution, data.Count);
 
-            txtStatistics.Clear();
-            lstDistribution.Clear();
-
-            txtStatistics.AppendText($"Минимальное значение: {minValue}\n");
-            txtStatistics.AppendText($"Максимальное значение: {maxValue}\n");
-            txtStatistics.AppendText($"Количество точек: {data.Count}\n");
-            txtStatistics.AppendText($"Размер бина: {binSize}\n");
-            txtStatistics.AppendText($"Количество интервалов: {intervalCount}\n");
-            txtStatistics.AppendText($"Энтропия Шеннона: {entropy:F4}\n\n");
-            lstDistribution.AppendText("Распределение по интервалам:\n");
-
-            foreach (var interval in distribution)
+            this.Invoke((MethodInvoker)delegate
             {
-                lstDistribution.AppendText($"[{interval.Key.Item1:F2}, {interval.Key.Item2:F2}]: {interval.Value} точек\n");
-            }
+                txtStatistics.Clear();
+                lstDistribution.Clear();
+
+                txtStatistics.AppendText($"Минимальное значение: {minValue}\n");
+                txtStatistics.AppendText($"Максимальное значение: {maxValue}\n");
+                txtStatistics.AppendText($"Количество точек: {data.Count}\n");
+                txtStatistics.AppendText($"Размер бина: {binSize}\n");
+                txtStatistics.AppendText($"Количество интервалов: {intervalCount}\n");
+                txtStatistics.AppendText($"Энтропия Шеннона: {entropy:F4}\n\n");
+                lstDistribution.AppendText("Распределение по интервалам:\n");
+
+                foreach (var interval in distribution)
+                {
+                    lstDistribution.AppendText($"[{interval.Key.Item1:F2}, {interval.Key.Item2:F2}]: {interval.Value} точек\n");
+                }
+            });
         }
 
         private double CalculateEntropy(Dictionary<(double, double), int> distribution, int totalCount)
@@ -454,5 +507,26 @@ namespace EntropicZest
 
         }
 
+        private void btnCancel_Click(object sender, EventArgs e)
+        {
+            cts?.Cancel();
+        }
+
+        private void SetBusyState(bool isBusy)
+        {
+            this.Invoke((MethodInvoker)delegate
+            {
+                btnLoadExcel.Enabled = !isBusy;
+                btnCalculate.Enabled = !isBusy;
+                btnSaveResults.Enabled = !isBusy;
+                btnCompareResults.Enabled = !isBusy;
+                btnLoadResults.Enabled = !isBusy;
+                btnBuildGraph.Enabled = !isBusy;
+                btnCancel.Visible = isBusy;
+                progressBar.Visible = isBusy;
+                progressBar.Value = 0;
+                lblStatus.Text = isBusy ? "Выполнение операции..." : "Готово";
+            });
+        }
     }
 }

@@ -29,9 +29,9 @@
         private void InitializeComponent()
         {
             System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(MainForm));
-            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea2 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
-            System.Windows.Forms.DataVisualization.Charting.Legend legend2 = new System.Windows.Forms.DataVisualization.Charting.Legend();
-            System.Windows.Forms.DataVisualization.Charting.Series series2 = new System.Windows.Forms.DataVisualization.Charting.Series();
+            System.Windows.Forms.DataVisualization.Charting.ChartArea chartArea1 = new System.Windows.Forms.DataVisualization.Charting.ChartArea();
+            System.Windows.Forms.DataVisualization.Charting.Legend legend1 = new System.Windows.Forms.DataVisualization.Charting.Legend();
+            System.Windows.Forms.DataVisualization.Charting.Series series1 = new System.Windows.Forms.DataVisualization.Charting.Series();
             this.txtBinSize = new System.Windows.Forms.TextBox();
             this.label1 = new System.Windows.Forms.Label();
             this.btnLoadExcel = new System.Windows.Forms.Button();
@@ -46,6 +46,9 @@
             this.chartDistribution = new System.Windows.Forms.DataVisualization.Charting.Chart();
             this.btnBuildGraph = new System.Windows.Forms.Button();
             this.panelGraph = new System.Windows.Forms.Panel();
+            this.progressBar = new System.Windows.Forms.ProgressBar();
+            this.lblStatus = new System.Windows.Forms.Label();
+            this.btnCancel = new System.Windows.Forms.Button();
             ((System.ComponentModel.ISupportInitialize)(this.chartDistribution)).BeginInit();
             this.panelGraph.SuspendLayout();
             this.SuspendLayout();
@@ -120,16 +123,16 @@
             // 
             // chartDistribution
             // 
-            chartArea2.Name = "ChartArea1";
-            this.chartDistribution.ChartAreas.Add(chartArea2);
-            legend2.Name = "Legend1";
-            this.chartDistribution.Legends.Add(legend2);
+            chartArea1.Name = "ChartArea1";
+            this.chartDistribution.ChartAreas.Add(chartArea1);
+            legend1.Name = "Legend1";
+            this.chartDistribution.Legends.Add(legend1);
             resources.ApplyResources(this.chartDistribution, "chartDistribution");
             this.chartDistribution.Name = "chartDistribution";
-            series2.ChartArea = "ChartArea1";
-            series2.Legend = "Legend1";
-            series2.Name = "Series1";
-            this.chartDistribution.Series.Add(series2);
+            series1.ChartArea = "ChartArea1";
+            series1.Legend = "Legend1";
+            series1.Name = "Series1";
+            this.chartDistribution.Series.Add(series1);
             // 
             // btnBuildGraph
             // 
@@ -144,10 +147,30 @@
             this.panelGraph.Controls.Add(this.chartDistribution);
             this.panelGraph.Name = "panelGraph";
             // 
+            // progressBar
+            // 
+            resources.ApplyResources(this.progressBar, "progressBar");
+            this.progressBar.Name = "progressBar";
+            // 
+            // lblStatus
+            // 
+            resources.ApplyResources(this.lblStatus, "lblStatus");
+            this.lblStatus.Name = "lblStatus";
+            // 
+            // btnCancel
+            // 
+            resources.ApplyResources(this.btnCancel, "btnCancel");
+            this.btnCancel.Name = "btnCancel";
+            this.btnCancel.UseVisualStyleBackColor = true;
+            this.btnCancel.Click += new System.EventHandler(this.btnCancel_Click);
+            // 
             // MainForm
             // 
             resources.ApplyResources(this, "$this");
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+            this.Controls.Add(this.btnCancel);
+            this.Controls.Add(this.lblStatus);
+            this.Controls.Add(this.progressBar);
             this.Controls.Add(this.panelGraph);
             this.Controls.Add(this.btnBuildGraph);
             this.Controls.Add(this.btnLoadResults);
@@ -186,6 +209,9 @@
         private System.Windows.Forms.DataVisualization.Charting.Chart chartDistribution;
         private System.Windows.Forms.Button btnBuildGraph;
         private System.Windows.Forms.Panel panelGraph;
+        private System.Windows.Forms.ProgressBar progressBar;
+        private System.Windows.Forms.Label lblStatus;
+        private System.Windows.Forms.Button btnCancel;
     }
 }
 
